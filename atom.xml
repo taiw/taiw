@@ -5,22 +5,60 @@
   <subtitle><![CDATA[WatchOS,iOS WatchKit开发]]></subtitle>
   <link href="/atom.xml" rel="self"/>
   <link href="http://"/>
-  <updated>2015-07-07T10:02:46.874Z</updated>
+  <updated>2015-07-08T01:15:17.692Z</updated>
   <id>http://</id>
   
   <author>
-    <name><![CDATA[Tai Wei]]></name>
-    
+    <name><![CDATA[台伟]]></name>
+    <email><![CDATA[taiw@163.com]]></email>
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title><![CDATA[WatchConnectivity通信框架小结]]></title>
+    <link href="http:/2015/07/07/WatchConnectivity%E9%80%9A%E4%BF%A1%E6%A1%86%E6%9E%B6%E5%B0%8F%E7%BB%93/"/>
+    <id>http:/2015/07/07/WatchConnectivity通信框架小结/</id>
+    <published>2015-07-07T01:12:56.000Z</published>
+    <updated>2015-07-08T01:15:17.692Z</updated>
+    <content type="html"><![CDATA[<p>WatchConnectivity是watchOS2里iPhone与AppleWatch通信的基础框架，作为开发AppleWatch应用的必学内容，我在学习后进行了小小的归纳总结。</p>
+<h1 id="初始化设置">初始化设置</h1><p>WatchConnectivity的原理是iPhone伴侣应用和AppleWatch上运行的WatchKit Extension之间通过WCSession会话进行通信。<br>当前Controller若需要响应WatchConnectivity的消息需要遵循WCSessionDelegate协议。<br>初始化时需要激活会话代理（iPhone应用和WatchKitExtension里都要激活），代码如下：<br>if WCSession.isSupported() {<br> let session=WCSession.defaultSession()<br> session.delegate=self<br> session.activateSession()<br>}</p>
+<h1 id="会话状态">会话状态</h1><p>为了了解iPhone应用与Watch应用的会话状态，我们可以通过一些属性去判断，注意这些操作只能在iPhone应用里进行。</p>
+<h2 id="1-检查是否配对">1.检查是否配对</h2><p>AppleWatch是否与iPhone配对，可以通过session.paired属性的布尔值进行判断</p>
+<h2 id="2-检查watchapp是否已安装">2.检查watchapp是否已安装</h2><p>即使已配对，watchapp也可能未安装成功，通过session.watchAppInstalled属性的布尔值可以得知此状态。另外，watchapp安装成功就会在手表上建立相应app的目录，因此session.watchAppInstalled==false效果等同于watchDirectoryURL != nil。<br>watchDirectoryURL一般只在需要额外的初始化处理的情况下，比如app重装恢复队列内容、设定初始设置时等情况下会用到。</p>
+<h2 id="3-检查是否开启表盘组件功能">3.检查是否开启表盘组件功能</h2><p>若watchapp支持complication表盘组件，那么session.complicationEnabled值为true。</p>
+<h1 id="通信">通信</h1><p>WatchConnectivity框架的通信方式有两种模式，一种是后台传输，另一种是交互式消息。</p>
+<h2 id="后台传输模式">后台传输模式</h2><p>后台传输模式是最常用的通信模式，面向内容与用户交互，主要用于传输非即时的内容，体现在内容可由操作系统智能传输（操作系统允许发送方可退出，选择传输时机，支持接收者下次启动时发送），并将内容以队列方式发送。<br>后台传输一般分三种类型：<br><strong>1. Application context</strong><br>发送方代码示例<br><figure class="highlight cs"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">do</span> &#123;</span><br><span class="line"><span class="keyword">let</span> context=<span class="comment">//最新内容,初始化context</span></span><br><span class="line"><span class="keyword">try</span> WCSession.defaultSession().updateApplicationContext(context)</span><br><span class="line">&#125;<span class="keyword">catch</span> &#123;</span><br><span class="line"><span class="comment">//</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>接收方需响应以下代理方法，<br><figure class="highlight swift"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="func"><span class="keyword">func</span> <span class="title">session</span><span class="params">(session:WCSession,didReceiveApplicationContext:applicationContext:[String:AnyObject])</span></span>&#123;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>ApplicationContext传输数据常见于传输单个字典类型数据的情况，非常适合仅需要信息子集的AppleWatch应用。</p>
+<p><strong>2. Userinfo transfer</strong><br>Userinfo方式与ApplicationContext相比能够传输更复杂的数据。<br>发送方示例代码：<br><figure class="highlight stylus"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">let userInfo=<span class="comment">//待传输的内容</span></span><br><span class="line">let userInfoTransfer=WCSession.<span class="function"><span class="title">defaultSession</span><span class="params">()</span></span>.<span class="function"><span class="title">transferUserInfo</span><span class="params">(userInfo)</span></span></span><br></pre></td></tr></table></figure></p>
+<p>userInfoTransfer传输器封装了待传数据，并且你可以通过代码控制来取消传输。<br>未传输的内容可以这样获取<br><figure class="highlight stylus"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">let transfer=WCSession.<span class="function"><span class="title">defaultSession</span><span class="params">()</span></span>.<span class="function"><span class="title">outstandingUserInfoTransfer</span><span class="params">(userInfo)</span></span></span><br></pre></td></tr></table></figure></p>
+<p>接收方通过以下回调方法进行处理：<br><figure class="highlight swift"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="func"><span class="keyword">func</span> <span class="title">session</span><span class="params">(session:WCSession,didReceiveUserInfo userInfo:[String:AnyObject])</span></span> &#123;</span><br><span class="line"><span class="comment">//处理接收的userInfo</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>Userinfo transfer适合内存内容的传输，并且支持访问队列里的未传输内容。<br><strong>3. File transfer</strong><br>File transfer面向文件，API使用上和Userinfo transfer很像，支持队列，支持未完成内容的访问，需要附加元数据信息。<br>发送方示例代码如下：<br><figure class="highlight stylus"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">let url=<span class="comment">//文件地址</span></span><br><span class="line">let metadata=<span class="comment">//字典形式元数据</span></span><br><span class="line">let fileTransfer=WCSession.<span class="function"><span class="title">defaultSession</span><span class="params">()</span></span>.<span class="function"><span class="title">transferFile</span><span class="params">(url,metadata:metadata)</span></span></span><br></pre></td></tr></table></figure></p>
+<p>接收方代码如下：<br><figure class="highlight swift"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="func"><span class="keyword">func</span> <span class="title">session</span><span class="params">(session:WCSession,didReceiveFile file:WCSessionFile)</span></span> &#123;</span><br><span class="line"><span class="comment">//处理接收的File</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h2 id="交互式消息">交互式消息</h2><p>交互式消息能够为iPhone和AppleWatch间提供实时的通讯功能。<br>使用前提：1.设备间能够无线联通；2.应用之间能够联通，这意味着AppleWatch端的程序必须前台运行，即session的reachable值为true。<br>与后台传输模式的一个值得注意的区别是：若iOS应用未启动，AppleWatch上运行的WatchKit扩展能够启动iOS应用！<br>交互式消息方式可以传输两种数据类型的消息：<br><strong>1.字典</strong><br><figure class="highlight swift"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="func"><span class="keyword">func</span> <span class="title">sendMessage</span><span class="params">(message:,replyHandler:,errorHandler:)</span></span></span><br></pre></td></tr></table></figure></p>
+<p><strong>2.数据</strong><br>支持可序列化的自定义数据<br><figure class="highlight swift"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="func"><span class="keyword">func</span> <span class="title">sendMessageData</span><span class="params">(data:,replyHandler:,errorHandler:)</span></span></span><br></pre></td></tr></table></figure></p>
+<p>值得注意的是，replyHandler是optional可选类型，但目前版本里(Xcode7beta2)若使用nil作为参数，系统将无法确认而认为发送消息失败。<br>在以下方法里进行接收时的回调处理<br><figure class="highlight swift"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="func"><span class="keyword">func</span> <span class="title">session</span><span class="params">(session:WCSession,didReceiveMessage message:[String:AnyObject],replyHandler:<span class="params">([String:AnyObject])</span></span></span> -&gt; <span class="type">Void</span>)&#123;</span><br><span class="line"><span class="comment">//消息处理并返回</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+]]></content>
+    <summary type="html">
+    <![CDATA[<p>WatchConnectivity是watchOS2里iPhone与AppleWatch通信的基础框架，作为开发AppleWatch应用的必学内容，我在学习后进行了小小的归纳总结。</p>
+<h1 id="初始化设置">初始化设置</h1><p>WatchConnectiv]]>
+    </summary>
+    
+      <category term="iOS" scheme="http:/tags/iOS/"/>
+    
+      <category term="swift" scheme="http:/tags/swift/"/>
+    
+      <category term="watchOS" scheme="http:/tags/watchOS/"/>
+    
+  </entry>
   
   <entry>
     <title><![CDATA[AppleWatch应用优化的一些心得技巧总结]]></title>
     <link href="http:/2015/05/29/AppleWatch%E5%BA%94%E7%94%A8%E4%BC%98%E5%8C%96%E7%9A%84%E4%B8%80%E4%BA%9B%E5%BF%83%E5%BE%97%E6%8A%80%E5%B7%A7%E6%80%BB%E7%BB%93/"/>
     <id>http:/2015/05/29/AppleWatch应用优化的一些心得技巧总结/</id>
     <published>2015-05-29T10:56:59.000Z</published>
-    <updated>2015-07-07T10:02:46.874Z</updated>
+    <updated>2015-07-08T01:16:43.311Z</updated>
     <content type="html"><![CDATA[<p>&nbsp;&nbsp;在笔者3月份为AppleWatch开发RebelSheep小游戏进行真机测试的时候就发现了目前AppleWatch上第三方应用的性能并不理想，而测试部分WatchAppStore里推荐的应用甚至都没能成功开启。尽管WatchOS 1.01已经提升了已优化了应用启动的速度，但用户普遍感受还是体验较差，因此我们有必要尽全力优化自己的AppleWatch应用。笔者结合自己的体会和其它先驱者的一些心得对相关技巧做了一些汇总，分设计优化和资源优化两方面来说一下。</p>
 <blockquote>
 <p><strong>优化目标</strong>：缩短WatchApp的启动时间，提升响应速度<br><strong>代码环境</strong>：Swift 1.2、Xcode6.3.2</p>
@@ -42,6 +80,8 @@
     </summary>
     
       <category term="iOS" scheme="http:/tags/iOS/"/>
+    
+      <category term="swift" scheme="http:/tags/swift/"/>
     
       <category term="watchOS" scheme="http:/tags/watchOS/"/>
     
